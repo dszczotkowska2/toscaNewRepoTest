@@ -22,7 +22,7 @@ jobs:
       run: npx playwright install --with-deps
 
     - name: Run Playwright tests
-      run: npx playwright test
+      run: npx playwright test --reporter=html,list,github
 
     # Ten krok zapisuje raport, żebyś mogła go pobrać
     - uses: actions/upload-artifact@v4
