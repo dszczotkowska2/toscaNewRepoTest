@@ -6,20 +6,24 @@ on:
     branches: [ main, master ]
   workflow_dispatch:
 
-# Dodajemy uprawnienia potrzebne do publikacji raportu na GitHub Pages
+# NIEZBĘDNE: Uprawnienia do publikacji raportu na GitHub Pages
 permissions:
   contents: read
   pages: write
   id-token: write
 
+# Zapobiega nakładaniu się na siebie kilku publikacji raportu jednocześnie
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
 jobs:
   test:
     timeout-minutes: 60
     runs-on: ubuntu-latest
-    outputs:
-      report_url: ${{ steps.deployment.outputs.page_url }}
     steps:
     - uses: actions/checkout@v4
+    
     - uses: actions/setup-node@v4
       with:
         node-version: lts/*
@@ -47,29 +51,17 @@ jobs:
       run: npx playwright install-deps
 
     - name: Run Playwright tests
-      # Dodajemy 'blob' reporter, jeśli planujesz w przyszłości łączyć raporty, 
-      # ale na razie zostajemy przy html i github dla czytelności.
-      run: npx playwright test --reporter=html,github
+      # ZOSTAWIAMY: 'list' dla logów w konsoli i 'html' dla Twojego raportu.
+      # USUWAMY: 'github', żeby pozbyć się "rozpierdzielu" w Annotations.
+      run: npx playwright test --reporter=list,html
 
-    # --- SEKCJA RAPORTOWANIA ---
-
-    - name: Upload Artifact
-      if: always()
-      uses: actions/upload-artifact@v4
-      with:
-        name: playwright-report
-        path: playwright-report/
-        retention-days: 30
-
-    - name: Setup Pages
-      if: always()
-      uses: actions/configure-pages@v4
+    # --- SEKCJA RAPORTU (GITHUB PAGES) ---
 
     - name: Upload Pages Artifact
       if: always()
       uses: actions/upload-pages-artifact@v3
       with:
-        path: playwright-report/
+        path: playwright-report/ # Folder, który generuje Playwright
 
     - name: Deploy to GitHub Pages
       if: always()
