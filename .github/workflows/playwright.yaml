@@ -4,11 +4,20 @@ on:
     branches: [ main, master ]
   pull_request:
     branches: [ main, master ]
+  workflow_dispatch:
+
+# Dodajemy uprawnienia potrzebne do publikacji raportu na GitHub Pages
+permissions:
+  contents: read
+  pages: write
+  id-token: write
 
 jobs:
   test:
     timeout-minutes: 60
     runs-on: ubuntu-latest
+    outputs:
+      report_url: ${{ steps.deployment.outputs.page_url }}
     steps:
     - uses: actions/checkout@v4
     - uses: actions/setup-node@v4
@@ -18,16 +27,51 @@ jobs:
     - name: Install dependencies
       run: npm ci
 
+    - name: Get Playwright version
+      id: playwright-version
+      run: echo "version=$(npx playwright --version)" >> $GITHUB_OUTPUT
+
+    - name: Cache Playwright browsers
+      uses: actions/cache@v4
+      id: playwright-cache
+      with:
+        path: ~/.cache/ms-playwright
+        key: ${{ runner.os }}-playwright-${{ steps.playwright-version.outputs.version }}
+
     - name: Install Playwright Browsers
+      if: steps.playwright-cache.outputs.cache-hit != 'true'
       run: npx playwright install --with-deps
 
-    - name: Run Playwright tests
-      run: npx playwright test --reporter=html,list,github
+    - name: Install Playwright system dependencies
+      if: steps.playwright-cache.outputs.cache-hit == 'true'
+      run: npx playwright install-deps
 
-    # Ten krok zapisuje raport, żebyś mogła go pobrać
-    - uses: actions/upload-artifact@v4
+    - name: Run Playwright tests
+      # Dodajemy 'blob' reporter, jeśli planujesz w przyszłości łączyć raporty, 
+      # ale na razie zostajemy przy html i github dla czytelności.
+      run: npx playwright test --reporter=html,github
+
+    # --- SEKCJA RAPORTOWANIA ---
+
+    - name: Upload Artifact
       if: always()
+      uses: actions/upload-artifact@v4
       with:
         name: playwright-report
         path: playwright-report/
         retention-days: 30
+
+    - name: Setup Pages
+      if: always()
+      uses: actions/configure-pages@v4
+
+    - name: Upload Pages Artifact
+      if: always()
+      uses: actions/upload-pages-artifact@v3
+      with:
+        path: playwright-report/
+
+    - name: Deploy to GitHub Pages
+      if: always()
+      id: deployment
+      uses: actions/deploy-pages@v4
