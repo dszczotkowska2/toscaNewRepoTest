@@ -6,13 +6,11 @@ on:
     branches: [ main, master ]
   workflow_dispatch:
 
-# NIEZBĘDNE: Uprawnienia do publikacji raportu na GitHub Pages
 permissions:
   contents: read
   pages: write
   id-token: write
 
-# Zapobiega nakładaniu się na siebie kilku publikacji raportu jednocześnie
 concurrency:
   group: "pages"
   cancel-in-progress: false
@@ -51,19 +49,43 @@ jobs:
       run: npx playwright install-deps
 
     - name: Run Playwright tests
-      # ZOSTAWIAMY: 'list' dla logów w konsoli i 'html' dla Twojego raportu.
-      # USUWAMY: 'github', żeby pozbyć się "rozpierdzielu" w Annotations.
+      id: playwright-run
+      # Używamy tylko reporterów, które nie śmiecą w Annotations
       run: npx playwright test --reporter=list,html
+      continue-on-error: true
 
-    # --- SEKCJA RAPORTU (GITHUB PAGES) ---
+    # --- SEKCJA RAPORTOWANIA ---
 
     - name: Upload Pages Artifact
       if: always()
       uses: actions/upload-pages-artifact@v3
       with:
-        path: playwright-report/ # Folder, który generuje Playwright
+        path: playwright-report/
 
     - name: Deploy to GitHub Pages
       if: always()
       id: deployment
       uses: actions/deploy-pages@v4
+
+    # Generujemy własne, bogate podsumowanie zamiast biednych adnotacji
+    - name: Create Custom Summary
+      if: always()
+      run: |
+        echo "## 📊 Wyniki Testów Playwright" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        if [ "${{ steps.playwright-run.outcome }}" == "success" ]; then
+          echo "✅ **Status:** Sukces" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "❌ **Status:** Błąd (Testy nie przeszły)" >> $GITHUB_STEP_SUMMARY
+        fi
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "🌐 **Pełny raport dostępny tutaj:**" >> $GITHUB_STEP_SUMMARY
+        echo "### [👉 OTWÓRZ INTERAKTYWNY RAPORT](${{ steps.deployment.outputs.page_url }})" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "---" >> $GITHUB_STEP_SUMMARY
+        echo "*Wskazówka: W raporcie powyżej znajdziesz screenshoty, nagrania wideo i Trace Viewera.*" >> $GITHUB_STEP_SUMMARY
+
+    # Na koniec wymuszamy błąd joba, jeśli testy padły, żeby kółko było czerwone
+    - name: Exit with error if tests failed
+      if: steps.playwright-run.outcome == 'failure'
+      run: exit 1
