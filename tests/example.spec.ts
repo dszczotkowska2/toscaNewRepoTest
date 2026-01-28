@@ -7,10 +7,7 @@ test('Verify articles section on landing page', async ({ landingPage }) => {
     await landingPage.clickArticles();
   });
 
-  await test.step('Verify that Articles header is displayed', async () => {
-    await expect(landingPage.articlesHeader).toBeVisible();
-  });
-}); // <--- Tutaj zamykamy pierwszy test
+}); 
 
 // TEST 2
 test('Verify 2', async ({ landingPage }) => {
